@@ -1,0 +1,56 @@
+<?php
+/**
+ * @file
+ * Adds PDFs to ubercart order mails.
+ * PDFs can be specified by using tokens.
+ *
+ * e.g. [pdf:invoice:123]
+ */
+
+/**
+ * Implements hook_mail_alter()
+ */
+function uc_pdf_invoice_mail_alter(&$message) {
+  if (($message['id'] == 'uc_order_action-mail' && strpos($message['subject'], '[invoice]') !== FALSE) || $message['id'] == 'uc_order_invoice') {
+    $order = NULL;
+    if (isset($message['params']['order'])) {
+      $order = $message['params']['order'];
+    }
+    else if (isset($message['params']['ucorder'])) {
+      $order = $message['params']['uc_order'];
+    }
+    else if (isset($message['params']['replacements']['uc_order'])) {
+      $order = $message['params']['replacements']['uc_order'];
+    }
+
+    if ($order) {
+      $account = user_load($order->uid);
+
+      $filename = transliteration_clean_filename(t('!store_name Invoice !order_id', array(
+        '!store_name' => variable_get('uc_store_name', ''),
+        '!order_id' => $order->order_id,
+      ))) . '.pdf';
+
+      $path = 'user/' . $order->uid . '/orders/' . $order->order_id . '/print';
+
+      $message['subject'] = trim(str_replace('[invoice]', '', $message['subject']));
+
+      $filepath = _wkhtmltopdf_generate_file($path, $account);
+      if (file_exists($filepath)) {
+        $message['params']['attachments'] = array(
+          array(
+            'filepath' => str_replace('files/', 'public://', $filepath),
+            'filename' => $filename,
+            'filemime' => file_get_mimetype($filename),
+          ),
+        );
+      }
+      else {
+        watchdog('druckverlag_kettler', 'PDF could not be created.', array(), WATCHDOG_ERROR);
+      }
+    }
+    else {
+      watchdog('druckverlag_kettler', 'Order could not be loaded.', array(), WATCHDOG_ERROR);
+    }
+  }
+}
