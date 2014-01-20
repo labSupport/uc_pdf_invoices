@@ -1,2 +1,3 @@
-uc_pdf_invoices
+[Drupal] Ubercart PDF Invoices
 ===============
+Send order invoices as PDF attachment.
